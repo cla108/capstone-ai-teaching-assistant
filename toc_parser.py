@@ -1,0 +1,164 @@
+import re
+
+
+def extract_toc_lines(full_text):
+    lines = full_text.splitlines()
+
+    toc_lines = []
+    inside_toc = False
+
+    for line in lines:
+        clean = line.strip()
+
+        if clean.lower() == "contents":
+            inside_toc = True
+            continue
+
+        if inside_toc and clean.startswith("--- PAGE"):
+            continue
+
+        if inside_toc and clean.lower().startswith("preface"):
+            continue
+
+        if inside_toc and clean.lower().startswith("chapter 1"):
+            toc_lines.append(clean)
+            continue
+
+        if inside_toc:
+            if not clean:
+                continue
+
+            toc_lines.append(clean)
+
+    return toc_lines
+
+
+def is_noise_line(line):
+    line = line.strip()
+
+    noise_patterns = [
+        r"^[ivxlcdm]+$",
+        r"^[ivxlcdm]+\s+Contents$",
+        r"^Contents\s+[ivxlcdm]+$",
+    ]
+
+    for pattern in noise_patterns:
+        if re.match(pattern, line, re.IGNORECASE):
+            return True
+
+    return False
+
+
+def normalize_toc_lines(toc_lines):
+    entries = []
+    buffer = ""
+
+    for raw_line in toc_lines:
+        line = raw_line.strip()
+
+        if is_noise_line(line):
+            continue
+
+        if re.match(r"^Part\s+[IVXLC]+$", line, re.IGNORECASE):
+            if buffer:
+                entries.append(buffer.strip())
+                buffer = ""
+
+            entries.append(line)
+            continue
+
+        if re.match(r"^Chapter\s+\d+\b", line, re.IGNORECASE):
+            if buffer:
+                entries.append(buffer.strip())
+                buffer = ""
+
+            buffer = line
+
+            if re.search(r"\s\d+$", buffer):
+                entries.append(buffer.strip())
+                buffer = ""
+
+            continue
+
+        if not buffer:
+            buffer = line
+        else:
+            buffer += " " + line
+
+        if re.search(r"\s\d+$", buffer):
+            entries.append(buffer.strip())
+            buffer = ""
+
+    if buffer:
+        entries.append(buffer.strip())
+
+    return entries
+
+
+def parse_toc(toc_lines):
+    entries = normalize_toc_lines(toc_lines)
+
+    structure = []
+    current_part = None
+    current_chapter = None
+
+    part_pattern = re.compile(r"^Part\s+([IVXLC]+)\s*(.*)$", re.IGNORECASE)
+    chapter_pattern = re.compile(r"^Chapter\s+(\d+)\s+(.+?)\s+(\d+)$", re.IGNORECASE)
+    section_pattern = re.compile(r"^(.+?)\s+(\d+)$")
+
+    ignored_starts = (
+        "Preface",
+        "About the Authors",
+        "Suggested Readings",
+        "Glossary",
+        "Name Index",
+        "Subject Index",
+        "Appendix A",
+        "Appendix B",
+    )
+
+    for entry in entries:
+        part_match = part_pattern.match(entry)
+
+        if part_match:
+            current_part = {
+                "part": entry,
+                "chapters": []
+            }
+            structure.append(current_part)
+            current_chapter = None
+            continue
+
+        if entry.startswith(ignored_starts):
+            current_chapter = None
+            continue
+
+        chapter_match = chapter_pattern.match(entry)
+
+        if chapter_match:
+            current_chapter = {
+                "chapter_number": int(chapter_match.group(1)),
+                "chapter_title": chapter_match.group(2).strip(),
+                "start_page": int(chapter_match.group(3)),
+                "sections": []
+            }
+
+            if current_part is None:
+                current_part = {
+                    "part": "No Part",
+                    "chapters": []
+                }
+                structure.append(current_part)
+
+            current_part["chapters"].append(current_chapter)
+            continue
+
+        section_match = section_pattern.match(entry)
+
+        if section_match and current_chapter is not None:
+            current_chapter["sections"].append({
+                "section_title": section_match.group(1).strip(),
+                "start_page": int(section_match.group(2))
+            })
+
+    return structure
