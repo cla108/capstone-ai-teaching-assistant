@@ -2,6 +2,7 @@ import streamlit as st
 
 from pdf_processor import extract_text_from_pdf, combine_pages
 from toc_parser import extract_toc_lines, normalize_toc_lines, parse_toc
+from chapter_extractor import extract_chapters_from_pages
 
 
 st.set_page_config(
@@ -38,6 +39,8 @@ if uploaded_file is not None:
         toc_lines = extract_toc_lines(full_text)
         normalized_entries = normalize_toc_lines(toc_lines)
         structure = parse_toc(toc_lines)
+        chapters = extract_chapters_from_pages(pages, structure)
+
 
     st.subheader("Raw TOC Lines")
     st.text_area(
@@ -73,3 +76,38 @@ if uploaded_file is not None:
                     f"- {section['section_title']} "
                     f"(p. {section['start_page']})"
                 )
+
+    st.subheader("Extracted Chapter Text")
+
+    chapter_options = [
+        f"Chapter {chapter['chapter_number']}: {chapter['chapter_title']}"
+        for chapter in chapters
+    ]
+
+    selected_chapter_label = st.selectbox(
+        "Select chapter to preview",
+        chapter_options
+    )
+
+    selected_index = chapter_options.index(selected_chapter_label)
+    selected_chapter = chapters[selected_index]
+
+    st.write(f"Start page: {selected_chapter['start_page']}")
+    st.write(f"End page: {selected_chapter['end_page']}")
+    st.write(f"Characters: {len(selected_chapter['text']):,}")
+
+    preview_length = st.slider(
+    "Preview length",
+    min_value=1000,
+    max_value=10000,
+    value=3000,
+    step=1000
+)
+
+    st.text_area(
+        "Chapter text preview",
+        selected_chapter["text"][:preview_length],
+        height=400
+    )
+
+    st.write(f"Total extracted chapters: {len(chapters)}")

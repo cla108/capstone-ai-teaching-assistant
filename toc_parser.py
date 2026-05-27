@@ -1,7 +1,25 @@
+
 import re
 
 
 def extract_toc_lines(full_text):
+    """
+    Extracts raw Table of Contents (TOC) lines from the full textbook text.
+
+    Parameters:
+        full_text (str):
+            Full extracted textbook text, including page markers.
+
+    Returns:
+        list[str]:
+            Raw TOC lines.
+
+    Purpose:
+        Identifies the textbook's Table of Contents section so it can be
+        cleaned, normalized, and converted into a structured representation
+        of parts, chapters, sections, and page numbers.
+    """
+
     lines = full_text.splitlines()
 
     toc_lines = []
@@ -34,6 +52,22 @@ def extract_toc_lines(full_text):
 
 
 def is_noise_line(line):
+    """
+    Checks whether a TOC line is noise rather than useful structure.
+
+    Parameters:
+        line (str):
+            A single extracted TOC line.
+
+    Returns:
+        bool:
+            True if the line is noise; False otherwise.
+
+    Purpose:
+        Removes PDF artifacts such as Roman numeral page labels
+        and repeated 'Contents' headers.
+    """
+
     line = line.strip()
 
     noise_patterns = [
@@ -50,6 +84,34 @@ def is_noise_line(line):
 
 
 def normalize_toc_lines(toc_lines):
+    """
+    Normalizes raw TOC lines into complete TOC entries.
+
+    Parameters:
+        toc_lines (list[str]):
+            Raw TOC lines extracted from the textbook.
+
+    Returns:
+        list[str]:
+            Cleaned and merged TOC entries.
+
+    Purpose:
+        Fixes common PDF extraction issues, especially multiline entries.
+        For example:
+
+            Chapter 3 Transportation Regulation and Public
+            Policy 54
+
+        becomes:
+
+            Chapter 3 Transportation Regulation and Public Policy 54
+
+    Notes:
+        A TOC entry is considered complete when it ends with a page number.
+        Part headings are preserved even though they usually do not have
+        page numbers.
+    """
+
     entries = []
     buffer = ""
 
@@ -96,6 +158,43 @@ def normalize_toc_lines(toc_lines):
 
 
 def parse_toc(toc_lines):
+    """
+    Parses normalized TOC entries into a structured textbook hierarchy.
+
+    Parameters:
+        toc_lines (list[str]):
+            Raw TOC lines extracted from the textbook.
+
+    Returns:
+        list[dict]:
+            Structured representation of the textbook.
+
+            Example:
+            [
+                {
+                    "part": "Part I",
+                    "chapters": [
+                        {
+                            "chapter_number": 1,
+                            "chapter_title": "...",
+                            "start_page": 3,
+                            "sections": [
+                                {
+                                    "section_title": "...",
+                                    "start_page": 6
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+
+    Purpose:
+        Converts the Table of Contents into machine-readable metadata
+        that can be used for chapter extraction, section-aware chunking,
+        RAG retrieval, citation tracing, and lesson-plan generation.
+    """
+
     entries = normalize_toc_lines(toc_lines)
 
     structure = []
@@ -103,7 +202,10 @@ def parse_toc(toc_lines):
     current_chapter = None
 
     part_pattern = re.compile(r"^Part\s+([IVXLC]+)\s*(.*)$", re.IGNORECASE)
-    chapter_pattern = re.compile(r"^Chapter\s+(\d+)\s+(.+?)\s+(\d+)$", re.IGNORECASE)
+    chapter_pattern = re.compile(
+        r"^Chapter\s+(\d+)\s+(.+?)\s+(\d+)$",
+        re.IGNORECASE
+    )
     section_pattern = re.compile(r"^(.+?)\s+(\d+)$")
 
     ignored_starts = (
