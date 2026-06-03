@@ -1,36 +1,30 @@
+from io import BytesIO
+
 import pypdfium2 as pdfium
 
 
 def extract_text_from_pdf(pdf_file):
     """
     Extracts raw text from each page of a PDF document.
-
-    Parameters:
-        pdf_file (UploadedFile | str):
-            PDF file uploaded through Streamlit or local file path.
-
-    Returns:
-        list[dict]:
-            List of page dictionaries containing:
-            - page_number (int)
-            - text (str)
-
-    Purpose:
-        Converts textbook PDFs into structured page-level text
-        for downstream processing such as TOC parsing,
-        chapter extraction, semantic chunking, and RAG retrieval.
     """
 
-    pdf = pdfium.PdfDocument(pdf_file)
+    if hasattr(pdf_file, "getvalue"):
+        pdf_bytes = pdf_file.getvalue()
+        pdf_input = BytesIO(pdf_bytes)
+    else:
+        pdf_input = pdf_file
+
+    pdf = pdfium.PdfDocument(pdf_input)
 
     pages = []
 
     for page_index in range(len(pdf)):
-        page = pdf[page_index]
-
-        textpage = page.get_textpage()
-
-        text = textpage.get_text_range()
+        try:
+            page = pdf[page_index]
+            textpage = page.get_textpage()
+            text = textpage.get_text_range()
+        except Exception as error:
+            text = f"[ERROR: Could not extract page {page_index + 1}: {error}]"
 
         pages.append({
             "page_number": page_index + 1,
@@ -44,29 +38,6 @@ def combine_pages(pages):
     """
     Combines extracted PDF pages into a single text string
     while preserving page boundaries.
-
-    Parameters:
-        pages (list[dict]):
-            Output from extract_text_from_pdf().
-
-    Returns:
-        str:
-            Full textbook text with page markers.
-
-    Example Output:
-        --- PAGE 1 ---
-        textbook text...
-
-        --- PAGE 2 ---
-        textbook text...
-
-    Purpose:
-        Preserves page references required for:
-        - Table of contents reconstruction
-        - chapter boundary detection
-        - section extraction
-        - citation tracing
-        - hallucination verification
     """
 
     full_text = ""
