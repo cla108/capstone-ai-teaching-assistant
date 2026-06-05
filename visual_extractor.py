@@ -1,5 +1,4 @@
 import os
-from io import BytesIO
 
 import fitz  # PyMuPDF
 
@@ -9,13 +8,14 @@ def extract_images_from_pdf(
     start_page,
     end_page,
     chapter_number,
+    page_offset=0,
     output_dir="outputs/images"
 ):
     """
     Extracts embedded images from a chapter page range.
 
-    Pages are expected to use the same page numbering system
-    already used by the extracted PDF pages.
+    start_page and end_page are textbook page numbers.
+    page_offset converts textbook page numbers into PDF page numbers.
     """
 
     if hasattr(pdf_file, "getvalue"):
@@ -29,8 +29,9 @@ def extract_images_from_pdf(
 
     extracted_images = []
 
-    for page_number in range(start_page, end_page + 1):
-        page_index = page_number - 1
+    for textbook_page_number in range(start_page, end_page + 1):
+        pdf_page_number = textbook_page_number + page_offset
+        page_index = pdf_page_number - 1
 
         if page_index < 0 or page_index >= len(pdf):
             continue
@@ -48,7 +49,8 @@ def extract_images_from_pdf(
 
                 image_filename = (
                     f"chapter_{chapter_number}_"
-                    f"page_{page_number}_"
+                    f"textbook_page_{textbook_page_number}_"
+                    f"pdf_page_{pdf_page_number}_"
                     f"image_{image_index}.{image_ext}"
                 )
 
@@ -58,21 +60,25 @@ def extract_images_from_pdf(
                     image_file.write(image_bytes)
 
                 extracted_images.append({
+                    "type": "image",
                     "chapter_number": chapter_number,
-                    "page_number": page_number,
+                    "textbook_page_number": textbook_page_number,
+                    "pdf_page_number": pdf_page_number,
                     "image_index": image_index,
-                    "image_path": image_path,
                     "image_filename": image_filename,
-                    "type": "image"
+                    "image_path": image_path
                 })
 
             except Exception as error:
                 extracted_images.append({
+                    "type": "image_error",
                     "chapter_number": chapter_number,
-                    "page_number": page_number,
+                    "textbook_page_number": textbook_page_number,
+                    "pdf_page_number": pdf_page_number,
                     "image_index": image_index,
-                    "error": str(error),
-                    "type": "image_error"
+                    "error": str(error)
                 })
+
+    pdf.close()
 
     return extracted_images
