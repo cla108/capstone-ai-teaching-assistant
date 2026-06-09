@@ -2,48 +2,44 @@
 import re
 
 
-def extract_toc_lines(full_text):
+def extract_toc_lines(full_text, max_toc_pages=20):
     """
     Extracts raw Table of Contents (TOC) lines from the full textbook text.
 
-    Parameters:
-        full_text (str):
-            Full extracted textbook text, including page markers.
-
-    Returns:
-        list[str]:
-            Raw TOC lines.
-
-    Purpose:
-        Identifies the textbook's Table of Contents section so it can be
-        cleaned, normalized, and converted into a structured representation
-        of parts, chapters, sections, and page numbers.
+    Stops after a limited number of TOC pages to avoid reading the whole book.
     """
 
     lines = full_text.splitlines()
 
     toc_lines = []
     inside_toc = False
+    toc_start_pdf_page = None
+    current_pdf_page = None
 
     for line in lines:
         clean = line.strip()
 
-        if clean.lower() == "contents":
+        page_match = re.match(r"--- PAGE (\d+) ---", clean)
+
+        if page_match:
+            current_pdf_page = int(page_match.group(1))
+
+            if inside_toc and toc_start_pdf_page is not None:
+                if current_pdf_page > toc_start_pdf_page + max_toc_pages:
+                    break
+
+            continue
+
+        if clean.lower() in ["contents", "table of contents"]:
             inside_toc = True
-            continue
-
-        if inside_toc and clean.startswith("--- PAGE"):
-            continue
-
-        if inside_toc and clean.lower().startswith("preface"):
-            continue
-
-        if inside_toc and clean.lower().startswith("chapter 1"):
-            toc_lines.append(clean)
+            toc_start_pdf_page = current_pdf_page
             continue
 
         if inside_toc:
             if not clean:
+                continue
+
+            if clean.lower().startswith("preface"):
                 continue
 
             toc_lines.append(clean)
@@ -235,15 +231,46 @@ def parse_toc(toc_lines):
             current_chapter = None
             continue
 
+
+
+
         chapter_match = chapter_pattern.match(entry)
 
+
+
+
+
         if chapter_match:
+            chapter_title = chapter_match.group(2).strip()
+            chapter_number = int(chapter_match.group(1))
+            start_page = int(chapter_match.group(3))
+
+            # Ignore running headers / repeated chapter titles
+            if chapter_title.startswith("•"):
+                continue
+
+            # Ignore duplicate chapter numbers after the first valid occurrence
+            existing_chapter_numbers = [
+                chapter["chapter_number"]
+                for part in structure
+                for chapter in part["chapters"]
+            ]
+
+            if chapter_number in existing_chapter_numbers:
+                continue
+
             current_chapter = {
-                "chapter_number": int(chapter_match.group(1)),
-                "chapter_title": chapter_match.group(2).strip(),
-                "start_page": int(chapter_match.group(3)),
+                "chapter_number": chapter_number,
+                "chapter_title": chapter_title,
+                "start_page": start_page,
                 "sections": []
             }
+
+
+
+
+
+
 
             if current_part is None:
                 current_part = {
