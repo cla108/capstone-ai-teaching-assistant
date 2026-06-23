@@ -3,6 +3,8 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from example_loader import load_human_examples
+
 
 load_dotenv()
 
@@ -10,6 +12,10 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 def build_context_from_chunks(chunks):
+    """
+    Converts retrieved textbook chunks into source context for the LLM.
+    """
+
     context_parts = []
 
     for chunk in chunks:
@@ -33,63 +39,87 @@ def generate_instructor_guide(
     lecture_duration="90 minutes",
     model="gpt-4.1-mini"
 ):
-    context = build_context_from_chunks(retrieved_chunks)
+    """
+    Generates long-form instructor teaching notes using:
+    - textbook chunks as factual source
+    - human lesson examples as style guide
+    """
+
+    textbook_context = build_context_from_chunks(retrieved_chunks)
+    human_examples = load_human_examples()
 
     prompt = f"""
-You are creating condensed instructor teaching notes based on a textbook chapter.
+You are an expert lecturer and curriculum designer.
 
-This is NOT a quiz.
-This is NOT an activity plan.
-This is NOT a lecture flow.
-This is NOT a list of discussion questions.
+Your task is to create instructor-ready teaching notes from the selected textbook chapter.
 
-Your goal:
-Rewrite the chapter into a shorter, clearer instructor-facing guide.
+The guide should help an instructor teach the chapter clearly, practically, and efficiently.
+It should be detailed enough to teach from, but not unnecessarily long.
 
-Rules:
-- Use ONLY the provided textbook content.
-- Do NOT add external facts.
-- Do NOT invent examples.
-- Do NOT include quizzes, activities, or assessments.
-- Preserve the major ideas from the chapter.
-- Explain complex concepts clearly and directly.
-- Use a professional academic tone.
-- Follow the output schema exactly.
+Important source rules:
+- HUMAN EXAMPLES are only for style, structure, tone, and level of detail.
+- SOURCE CHUNKS are the only factual source for the new lesson.
+- Do not copy textbook sections word-for-word.
+- Do not invent textbook-specific facts, figures, tables, examples, cases, formulas, or page numbers.
+- Do not include images or tables for now.
 
 Selected chapter:
 Chapter {selected_chapter["chapter_number"]}: {selected_chapter["chapter_title"]}
 Textbook pages: {selected_chapter["start_page"]} to {selected_chapter["end_page"]}
 
-Target level: {difficulty_level}
-Suggested duration: {lecture_duration}
+Instructor settings:
+- Target level: {difficulty_level}
+- Suggested duration: {lecture_duration}
+
+HUMAN-WRITTEN LESSON EXAMPLES:
+{human_examples}
 
 SOURCE CHUNKS:
-{context}
+{textbook_context}
 
-Output schema:
+Create the instructor guide using this structure:
 
-# Instructor Guide
+1. Chapter Title
 
-## Chapter Information
-- Chapter:
-- Title:
-- Textbook pages:
-- Target level:
-- Suggested duration:
+2. Learning Objectives
+Rewrite 6 to 10 learning objectives clearly for students.
 
-## Learning Objectives
-Write 4 to 6 learning objectives based only on the chapter content.
+3. Chapter Overview
+Give a detailed overview of the chapter and why it matters.
 
-## Chapter Overview
-Write a short overview of the chapter and its purpose.
+4. Key Concepts and Teaching Notes
+Break the chapter into major topics.
+For each topic:
+• Explain the concept clearly.
+• State what the instructor should emphasize.
+• Mention important terms, models, formulas, laws, frameworks, or processes only if they appear in the source chunks.
+• Suggest how the instructor should explain it in class.
 
-## Detailed Summary
-Write a clear narrative summary of the chapter content.
-The summary should be much shorter than the original chapter, but detailed enough for an instructor to teach from.
-Break down complex ideas in a straightforward way.
+5. Suggested Lecture Flow
+Create a timed lecture plan for {lecture_duration}.
+Use this format:
+Time:
+Topic:
+Instructor action:
+Student engagement:
 
-## Figures, Images, and Tables
-Attach extracted boxed objects from the chapter.
+6. Common Student Misunderstandings
+Identify likely confusing areas and explain how the instructor can clarify them.
+Only use misunderstandings that logically follow from the provided content.
+
+7. Instructor Tips
+Give practical advice for teaching the chapter effectively.
+
+8. Final Chapter Summary
+Summarize the most important takeaways.
+
+Formatting rules:
+- Do not use Markdown heading symbols like # or ##.
+- Do not use Markdown tables.
+- Use clean numbered section headings.
+- Use bullet points where helpful.
+- Keep paragraphs short and readable.
+- The final output should look like a polished instructor handout.
 """
 
     response = client.chat.completions.create(
@@ -97,7 +127,7 @@ Attach extracted boxed objects from the chapter.
         messages=[
             {
                 "role": "system",
-                "content": "You are a careful instructional design assistant."
+                "content": "You are a careful academic instructional design assistant."
             },
             {
                 "role": "user",

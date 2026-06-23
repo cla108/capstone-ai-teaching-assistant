@@ -97,7 +97,7 @@ if uploaded_file is not None:
             f"{selected_chapter['chapter_title']}"
         )
 
-        retrieved_chunks = vector_store.search(lesson_query, k=8)
+        retrieved_chunks = vector_store.search(lesson_query, k=20)
         progress.progress(45)
 
         status.write("Generating instructor guide...")
@@ -140,8 +140,8 @@ if uploaded_file is not None:
 
         generate_lesson_pdf(
             instructor_guide=instructor_guide,
-            images=chapter_images,
-            boxed_objects=boxed_objects,
+            images=[],
+            boxed_objects=[],
             output_path=output_path
         )
 
