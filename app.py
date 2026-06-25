@@ -7,11 +7,9 @@ from chapter_extractor import extract_chapters_from_pages
 from chunker import create_chapter_chunks
 from vector_store import VectorStore
 from lesson_generator import generate_instructor_guide
-
+from evaluator import evaluate_lesson, rewrite_lesson_if_needed
 from pdf_generator import generate_lesson_pdf
 
-
-PAGE_OFFSET = 23
 
 st.set_page_config(
     page_title="Capstone AI Teaching Assistant",
@@ -35,6 +33,12 @@ if uploaded_file is not None:
         structure = parse_toc(toc_lines)
         chapters = extract_chapters_from_pages(pages, structure)
 
+    if not chapters:
+        st.error(
+            "No chapters were detected. Please upload a textbook PDF with a readable table of contents."
+        )
+        st.stop()
+
     st.success("Textbook processed successfully.")
 
     chapter_options = [
@@ -49,8 +53,6 @@ if uploaded_file is not None:
 
     selected_index = chapter_options.index(selected_chapter_label)
     selected_chapter = chapters[selected_index]
-
-
 
     st.write(
         f"Selected: Chapter {selected_chapter['chapter_number']} — "
@@ -86,12 +88,32 @@ if uploaded_file is not None:
         status.write("Generating instructor guide...")
         instructor_guide = generate_instructor_guide(
             selected_chapter=selected_chapter,
-            retrieved_chunks=retrieved_chunks,
-
+            retrieved_chunks=retrieved_chunks
         )
         progress.progress(65)
 
+        status.write("Evaluating generated lesson...")
+        evaluation = evaluate_lesson(
+            instructor_guide=instructor_guide,
+            retrieved_chunks=retrieved_chunks
+        )
         progress.progress(80)
+
+        status.write("Checking if rewrite is needed...")
+        instructor_guide, was_rewritten = rewrite_lesson_if_needed(
+            instructor_guide=instructor_guide,
+            retrieved_chunks=retrieved_chunks,
+            evaluation=evaluation
+        )
+
+        if was_rewritten:
+            status.write("Re-evaluating improved lesson...")
+            evaluation = evaluate_lesson(
+                instructor_guide=instructor_guide,
+                retrieved_chunks=retrieved_chunks
+            )
+
+        progress.progress(90)
 
         status.write("Creating PDF...")
 
@@ -110,10 +132,21 @@ if uploaded_file is not None:
         progress.progress(100)
         status.success("Lesson generated successfully.")
 
+        st.subheader("Evaluation Results")
+        st.json(evaluation)
+
+        if was_rewritten:
+            st.info("The lesson was automatically rewritten after evaluation.")
+        else:
+            st.success("The lesson passed evaluation without rewrite.")
+
         with open(output_path, "rb") as pdf_file:
             st.download_button(
                 label="Download PDF",
                 data=pdf_file,
-                file_name=f"chapter_{selected_chapter['chapter_number']}_instructor_guide.pdf",
+                file_name=(
+                    f"chapter_{selected_chapter['chapter_number']}"
+                    f"_instructor_guide.pdf"
+                ),
                 mime="application/pdf"
             )

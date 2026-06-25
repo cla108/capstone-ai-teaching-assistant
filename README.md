@@ -2,89 +2,107 @@
 
 LessonPlan AI is an AI-powered teaching assistant that automatically generates instructor-ready lesson guides from textbook chapters.
 
-The system combines PDF processing, Retrieval-Augmented Generation (RAG), semantic search, and GPT-5.5 to transform textbook content into structured teaching material.
+The system combines local PDF processing, Retrieval-Augmented Generation (RAG), semantic search, and GPT-5.5 to transform textbook chapters into structured instructor guides.
 
 ---
 
-## Features
+# Features
 
-- Upload any PDF textbook
-- Automatically detect the Table of Contents
-- Parse Parts, Chapters, and Sections
-- Select a chapter from a dropdown menu
+- Upload a textbook PDF
+- Automatic Table of Contents detection
+- Automatic chapter extraction
+- Dynamic page offset detection
 - Recursive + Semantic Chunking
-- Vector search using FAISS
+- Vector database using FAISS
 - Retrieval-Augmented Generation (RAG)
-- Human-example guided lesson generation
-- Export instructor guide as PDF
+- Human lesson examples (Few-shot Prompting)
+- Instructor guide generation using GPT-5.5
+- Automatic lesson evaluation
+- Hallucination detection
+- Automatic lesson refinement
+- Export lesson guide as PDF
 
 ---
 
-## Project Pipeline
+# Project Pipeline
 
 ```
 PDF
-    ↓
+ │
+ ▼
 Text Extraction
-    ↓
+ │
+ ▼
 TOC Parsing
-    ↓
+ │
+ ▼
 Chapter Extraction
-    ↓
+ │
+ ▼
+Dynamic Page Mapping
+ │
+ ▼
 Recursive + Semantic Chunking
-    ↓
-Vector Embeddings
-    ↓
-FAISS Retrieval
-    ↓
-GPT-5.5 Lesson Generation
-    ↓
-Instructor Guide PDF
+ │
+ ▼
+OpenAI Embeddings
+ │
+ ▼
+FAISS Vector Database
+ │
+ ▼
+Semantic Retrieval (RAG)
+ │
+ ▼
+Human Lesson Examples
+ │
+ ▼
+GPT-5.5 Lesson Generator
+ │
+ ▼
+Lesson Evaluation
+ │
+ ▼
+Automatic Rewrite (if required)
+ │
+ ▼
+PDF Export
 ```
 
 ---
 
-## Repository Structure
+# Technologies
 
-```
-LessonPlan_AI/
-
-├── app.py
-├── pdf_processor.py
-├── toc_parser.py
-├── chapter_extractor.py
-├── page_mapper.py
-├── chunker.py
-├── vector_store.py
-├── lesson_generator.py
-├── pdf_generator.py
-├── example_loader.py
-├── examples/
-├── outputs/
-├── requirements.txt
-└── README.md
-```
+- Python
+- Streamlit
+- OpenAI API
+- GPT-5.5
+- text-embedding-3-small
+- FAISS
+- LangChain
+- PyPDFium2
+- ReportLab
 
 ---
 
-## Installation
+# Installation
 
-Clone the repository
+Clone the repository.
 
 ```bash
 git clone <repository-url>
 cd LessonPlan_AI
 ```
 
-Create a virtual environment
+Create a virtual environment.
 
 ```bash
 python -m venv .venv
 ```
 
-Activate it
+Activate it.
 
-Linux / macOS
+Linux/macOS
 
 ```bash
 source .venv/bin/activate
@@ -96,7 +114,7 @@ Windows
 .venv\Scripts\activate
 ```
 
-Install dependencies
+Install dependencies.
 
 ```bash
 pip install -r requirements.txt
@@ -104,7 +122,7 @@ pip install -r requirements.txt
 
 ---
 
-## OpenAI API Key
+# OpenAI API Key
 
 Create a `.env` file in the project root.
 
@@ -119,7 +137,7 @@ The application uses:
 
 ---
 
-## Running the Application
+# Running the Application
 
 ```bash
 streamlit run app.py
@@ -127,50 +145,78 @@ streamlit run app.py
 
 ---
 
-## Workflow
+# Testing
 
-1. Upload a textbook PDF.
-2. The system extracts and parses the Table of Contents.
-3. Select a chapter.
-4. The chapter is recursively and semantically chunked.
-5. Chunks are embedded and stored in a FAISS vector database.
-6. Relevant chunks are retrieved using semantic search.
-7. GPT-5.5 generates an instructor guide using:
-   - Retrieved textbook content
-   - Human-written lesson examples as style references
-8. Download the generated lesson guide as a PDF.
+Run the complete pipeline test.
 
----
+```bash
+python test_pipeline.py
+```
 
-## Technologies
+The test validates:
 
-- Python
-- Streamlit
-- OpenAI API
-- GPT-5.5
-- text-embedding-3-small
-- FAISS
-- LangChain SemanticChunker
-- PyPDFium2
-- PyMuPDF
-- ReportLab
+- PDF extraction
+- TOC parsing
+- Chapter extraction
+- Recursive + semantic chunking
+- FAISS vector retrieval
+- Instructor guide generation
+- Lesson evaluation
+- Automatic rewrite
+- PDF generation
 
 ---
 
-## Future Improvements
+# Lesson Evaluation
 
-- Automatic extraction of textbook figures and tables
+Every generated lesson is automatically evaluated.
+
+The evaluator measures:
+
+- Hallucination rate
+- Coverage of textbook concepts
+- Structural completeness
+- Overall quality score
+
+If the lesson does not satisfy the quality thresholds, it is automatically rewritten before exporting the final PDF.
+
+---
+
+# Current Version
+
+Version 1.0
+
+Implemented:
+
+- Local PDF processing
+- Automatic TOC parsing
+- Dynamic chapter extraction
+- Recursive + Semantic Chunking
+- RAG
+- Few-shot prompting
+- GPT-5.5 lesson generation
+- Automatic evaluation
+- Hallucination detection
+- Automatic lesson refinement
+- PDF export
+
+---
+
+# Future Work
+
+- Local embedding models
+- Local language models
+- Automatic figure and table extraction
 - Citation-aware lesson generation
-- Lesson validation pipeline
 - Multi-chapter lesson generation
-- Interactive teaching activities
-- Instructor customization options
+- Interactive instructor editing
 
 ---
 
-## Authors
+# Author
 
-Clara Castro , Ebuka Onuoha
+Clara Castro, Ebuka Onuoha
 
 Capstone Project
+
 Langara College
