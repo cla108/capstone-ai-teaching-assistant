@@ -35,9 +35,7 @@ Pages: {chunk["start_page"]} to {chunk["end_page"]}
 def generate_instructor_guide(
     selected_chapter,
     retrieved_chunks,
-    difficulty_level="Undergraduate Year 1",
-    lecture_duration="90 minutes",
-    model="gpt-4.1-mini"
+    model="gpt-5.5"
 ):
     """
     Generates long-form instructor teaching notes using:
@@ -67,10 +65,6 @@ Selected chapter:
 Chapter {selected_chapter["chapter_number"]}: {selected_chapter["chapter_title"]}
 Textbook pages: {selected_chapter["start_page"]} to {selected_chapter["end_page"]}
 
-Instructor settings:
-- Target level: {difficulty_level}
-- Suggested duration: {lecture_duration}
-
 HUMAN-WRITTEN LESSON EXAMPLES:
 {human_examples}
 
@@ -96,7 +90,7 @@ For each topic:
 • Suggest how the instructor should explain it in class.
 
 5. Suggested Lecture Flow
-Create a timed lecture plan for {lecture_duration}.
+Create a timed lecture plan for a standard 90-minute class.
 Use this format:
 Time:
 Topic:
@@ -134,7 +128,7 @@ Formatting rules:
                 "content": prompt
             }
         ],
-        temperature=0.2
+
     )
 
     return response.choices[0].message.content

@@ -1,4 +1,6 @@
 import os
+import json
+import hashlib
 
 import faiss
 import numpy as np
@@ -10,10 +12,13 @@ load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+CACHE_DIR = "outputs/cache/embeddings"
+os.makedirs(CACHE_DIR, exist_ok=True)
+
 
 class VectorStore:
     """
-    Simple FAISS-based vector store for textbook chunks.
+    FAISS vector store with batched OpenAI embeddings and local caching.
     """
 
     def __init__(self):
@@ -21,10 +26,16 @@ class VectorStore:
         self.index = faiss.IndexFlatIP(self.dimension)
         self.chunks = []
 
+    def _cache_path(self, text):
+        key = hashlib.md5(text.encode("utf-8")).hexdigest()
+        return os.path.join(CACHE_DIR, f"{key}.json")
+
     def get_embedding(self, text):
-        """
-        Converts text into an embedding vector using OpenAI.
-        """
+        cache_path = self._cache_path(text)
+
+        if os.path.exists(cache_path):
+            with open(cache_path, "r", encoding="utf-8") as file:
+                return np.array(json.load(file), dtype="float32")
 
         response = client.embeddings.create(
             model="text-embedding-3-small",
@@ -33,31 +44,62 @@ class VectorStore:
 
         embedding = response.data[0].embedding
 
+        with open(cache_path, "w", encoding="utf-8") as file:
+            json.dump(embedding, file)
+
         return np.array(embedding, dtype="float32")
 
-    def add_chunks(self, chunks):
-        """
-        Embeds and stores textbook chunks.
-        """
-
+    def get_embeddings_batch(self, texts):
         embeddings = []
+        uncached_texts = []
+        uncached_indices = []
 
-        for chunk in chunks:
-            embedding = self.get_embedding(chunk["text"])
-            embeddings.append(embedding)
-            self.chunks.append(chunk)
+        for index, text in enumerate(texts):
+            cache_path = self._cache_path(text)
 
-        embeddings_matrix = np.vstack(embeddings)
+            if os.path.exists(cache_path):
+                with open(cache_path, "r", encoding="utf-8") as file:
+                    embeddings.append(np.array(json.load(file), dtype="float32"))
+            else:
+                embeddings.append(None)
+                uncached_texts.append(text)
+                uncached_indices.append(index)
 
+        if uncached_texts:
+            response = client.embeddings.create(
+                model="text-embedding-3-small",
+                input=uncached_texts
+            )
+
+            for response_item, original_index, text in zip(
+                response.data,
+                uncached_indices,
+                uncached_texts
+            ):
+                embedding = response_item.embedding
+                embeddings[original_index] = np.array(embedding, dtype="float32")
+
+                cache_path = self._cache_path(text)
+
+                with open(cache_path, "w", encoding="utf-8") as file:
+                    json.dump(embedding, file)
+
+        return embeddings
+
+    def add_chunks(self, chunks):
+        if not chunks:
+            return
+
+        texts = [chunk["text"] for chunk in chunks]
+        embeddings = self.get_embeddings_batch(texts)
+
+        embeddings_matrix = np.vstack(embeddings).astype("float32")
         faiss.normalize_L2(embeddings_matrix)
 
         self.index.add(embeddings_matrix)
+        self.chunks.extend(chunks)
 
     def search(self, query, k=5):
-        """
-        Retrieves the top-k most relevant chunks for a query.
-        """
-
         query_embedding = self.get_embedding(query)
         query_matrix = np.array([query_embedding], dtype="float32")
 

@@ -1,70 +1,203 @@
+import os
 import re
+import json
+import hashlib
+
+from dotenv import load_dotenv
+from langchain_experimental.text_splitter import SemanticChunker
+from langchain_openai import OpenAIEmbeddings
 
 
-def chunk_text_by_words(text, max_words=500, overlap_words=75):
-    """
-    Splits text into overlapping word-based chunks.
-    """
+load_dotenv()
 
+CACHE_DIR = "outputs/cache/chunks"
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+
+def count_words(text):
+    return len(text.split())
+
+
+def clean_text(text):
+    text = re.sub(r"--- PDF PAGE \d+ ---", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def split_into_paragraphs(text):
+    paragraphs = re.split(r"\n\s*\n", text)
+    return [p.strip() for p in paragraphs if p.strip()]
+
+
+def force_split_words(text, max_words):
     words = text.split()
     chunks = []
 
-    start = 0
-
-    while start < len(words):
-        end = start + max_words
-        chunk = " ".join(words[start:end])
-
-        chunks.append(chunk)
-
-        start += max_words - overlap_words
+    for i in range(0, len(words), max_words):
+        chunks.append(" ".join(words[i:i + max_words]))
 
     return chunks
 
 
-def create_chapter_chunks(chapter, max_words=500, overlap_words=75):
-    """
-    Creates retrieval-ready chunks from one chapter.
+def get_cache_path(chapter, max_words, overlap_words):
+    raw_key = (
+        f"{chapter['chapter_number']}_"
+        f"{chapter['chapter_title']}_"
+        f"{chapter['text'][:1000]}_"
+        f"{max_words}_{overlap_words}"
+    )
 
-    Each chunk keeps metadata needed for RAG.
+    key = hashlib.md5(raw_key.encode("utf-8")).hexdigest()
+    return os.path.join(CACHE_DIR, f"{key}.json")
+
+
+def semantic_split_large_text(text):
+    """
+    Uses LangChain SemanticChunker only for large blocks.
+    This keeps semantic chunking but avoids applying it to the whole chapter.
     """
 
-    raw_chunks = chunk_text_by_words(
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+    splitter = SemanticChunker(
+        embeddings,
+        breakpoint_threshold_type="percentile"
+    )
+
+    documents = splitter.create_documents([text])
+
+    return [
+        doc.page_content.strip()
+        for doc in documents
+        if doc.page_content.strip()
+    ]
+
+
+def recursive_semantic_split(
+    text,
+    max_words=500,
+    semantic_trigger_words=900
+):
+    """
+    Hybrid chunking:
+    1. Split by paragraphs first.
+    2. Keep paragraphs together when possible.
+    3. If a block is too large, apply semantic chunking.
+    4. If still too large, force split by word count.
+    """
+
+    text = clean_text(text)
+    paragraphs = split_into_paragraphs(text)
+
+    chunks = []
+    current_block = ""
+
+    for paragraph in paragraphs:
+        candidate = (current_block + "\n\n" + paragraph).strip()
+
+        if count_words(candidate) <= max_words:
+            current_block = candidate
+            continue
+
+        if current_block:
+            chunks.append(current_block)
+            current_block = ""
+
+        if count_words(paragraph) > semantic_trigger_words:
+            semantic_chunks = semantic_split_large_text(paragraph)
+
+            for semantic_chunk in semantic_chunks:
+                if count_words(semantic_chunk) <= max_words:
+                    chunks.append(semantic_chunk)
+                else:
+                    chunks.extend(force_split_words(semantic_chunk, max_words))
+
+        elif count_words(paragraph) > max_words:
+            chunks.extend(force_split_words(paragraph, max_words))
+
+        else:
+            current_block = paragraph
+
+    if current_block:
+        chunks.append(current_block)
+
+    return chunks
+
+
+def add_overlap(chunks, overlap_words=75):
+    if overlap_words <= 0 or len(chunks) <= 1:
+        return chunks
+
+    overlapped = []
+
+    for i, chunk in enumerate(chunks):
+        if i == 0:
+            overlapped.append(chunk)
+            continue
+
+        previous_words = chunks[i - 1].split()
+        overlap = " ".join(previous_words[-overlap_words:])
+
+        overlapped.append(
+            f"{overlap}\n\n{chunk}".strip()
+        )
+
+    return overlapped
+
+
+def create_chapter_chunks(
+    chapter,
+    max_words=500,
+    overlap_words=75,
+    semantic_trigger_words=900
+):
+    """
+    Creates recursive + semantic chunks.
+
+    Recursive:
+    - keeps paragraph structure where possible
+
+    Semantic:
+    - uses LangChain SemanticChunker only for large blocks
+
+    Cached:
+    - repeated runs on the same chapter are much faster
+    """
+
+    cache_path = get_cache_path(chapter, max_words, overlap_words)
+
+    if os.path.exists(cache_path):
+        with open(cache_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+
+    base_chunks = recursive_semantic_split(
         chapter["text"],
         max_words=max_words,
+        semantic_trigger_words=semantic_trigger_words
+    )
+
+    base_chunks = add_overlap(
+        base_chunks,
         overlap_words=overlap_words
     )
 
     chunks = []
 
-    for i, chunk_text in enumerate(raw_chunks, start=1):
+    for index, text in enumerate(base_chunks, start=1):
         chunks.append({
-            "chunk_id": i,
+            "chunk_id": index,
             "chapter_number": chapter["chapter_number"],
             "chapter_title": chapter["chapter_title"],
-            "part": chapter["part"],
             "start_page": chapter["start_page"],
             "end_page": chapter["end_page"],
-            "text": chunk_text
+            "pdf_start_page": chapter.get("pdf_start_page"),
+            "pdf_end_page": chapter.get("pdf_end_page"),
+            "chunking_method": "recursive paragraph chunking + semantic chunking for large blocks",
+            "word_count": count_words(text),
+            "text": text
         })
 
+    with open(cache_path, "w", encoding="utf-8") as file:
+        json.dump(chunks, file, indent=2)
+
     return chunks
-
-
-def create_all_chunks(chapters, max_words=500, overlap_words=75):
-    """
-    Creates chunks for all extracted chapters.
-    """
-
-    all_chunks = []
-
-    for chapter in chapters:
-        chapter_chunks = create_chapter_chunks(
-            chapter,
-            max_words=max_words,
-            overlap_words=overlap_words
-        )
-
-        all_chunks.extend(chapter_chunks)
-
-    return all_chunks

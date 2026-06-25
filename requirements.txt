@@ -1,0 +1,46 @@
+# =====================================================
+# LessonPlan AI
+#
+# Before running:
+#
+# 1. Create a virtual environment
+#
+# python -m venv .venv
+#
+# Activate it
+#
+# Linux/macOS
+# source .venv/bin/activate
+#
+# Windows
+# .venv\Scripts\activate
+#
+# Install packages
+#
+# pip install -r requirements.txt
+#
+# -----------------------------------------------------
+#
+# Create a .env file in the project root:
+#
+# OPENAI_API_KEY=your_api_key_here
+#
+# =====================================================
+
+streamlit
+openai
+python-dotenv
+
+numpy
+faiss-cpu
+
+langchain
+langchain-openai
+langchain-experimental
+
+pypdfium2
+PyMuPDF
+
+reportlab
+
+pillow

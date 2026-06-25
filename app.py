@@ -7,8 +7,7 @@ from chapter_extractor import extract_chapters_from_pages
 from chunker import create_chapter_chunks
 from vector_store import VectorStore
 from lesson_generator import generate_instructor_guide
-from visual_extractor import extract_images_from_pdf
-from table_extractor import extract_boxed_objects_as_images
+
 from pdf_generator import generate_lesson_pdf
 
 
@@ -51,23 +50,7 @@ if uploaded_file is not None:
     selected_index = chapter_options.index(selected_chapter_label)
     selected_chapter = chapters[selected_index]
 
-    difficulty_level = st.selectbox(
-        "Difficulty level",
-        [
-            "Beginner",
-            "Intermediate",
-            "Advanced",
-            "Undergraduate Year 1",
-            "Undergraduate Year 3",
-            "Postgraduate"
-        ],
-        index=3
-    )
 
-    lecture_duration = st.text_input(
-        "Lecture duration",
-        value="90 minutes"
-    )
 
     st.write(
         f"Selected: Chapter {selected_chapter['chapter_number']} — "
@@ -104,30 +87,11 @@ if uploaded_file is not None:
         instructor_guide = generate_instructor_guide(
             selected_chapter=selected_chapter,
             retrieved_chunks=retrieved_chunks,
-            difficulty_level=difficulty_level,
-            lecture_duration=lecture_duration
+
         )
         progress.progress(65)
 
-        status.write("Extracting chapter images...")
-        chapter_images = extract_images_from_pdf(
-            uploaded_file,
-            selected_chapter["start_page"],
-            selected_chapter["end_page"],
-            selected_chapter["chapter_number"],
-            page_offset=PAGE_OFFSET
-        )
         progress.progress(80)
-
-        status.write("Extracting tables, figures, and boxed objects...")
-        boxed_objects = extract_boxed_objects_as_images(
-            uploaded_file,
-            selected_chapter["start_page"],
-            selected_chapter["end_page"],
-            selected_chapter["chapter_number"],
-            page_offset=PAGE_OFFSET
-        )
-        progress.progress(90)
 
         status.write("Creating PDF...")
 
@@ -140,8 +104,6 @@ if uploaded_file is not None:
 
         generate_lesson_pdf(
             instructor_guide=instructor_guide,
-            images=[],
-            boxed_objects=[],
             output_path=output_path
         )
 
