@@ -15,7 +15,6 @@ The system combines local PDF processing, Retrieval-Augmented Generation (RAG), 
 - Recursive + Semantic Chunking
 - Vector database using FAISS
 - Retrieval-Augmented Generation (RAG)
-- Human lesson examples (Few-shot Prompting)
 - Instructor guide generation using GPT-5.5
 - Automatic lesson evaluation
 - Hallucination detection
@@ -52,9 +51,6 @@ FAISS Vector Database
  │
  ▼
 Semantic Retrieval (RAG)
- │
- ▼
-Human Lesson Examples
  │
  ▼
 GPT-5.5 Lesson Generator
