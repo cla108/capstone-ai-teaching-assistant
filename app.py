@@ -9,6 +9,7 @@ from vector_store import VectorStore
 from lesson_generator import generate_instructor_guide
 from evaluator import evaluate_lesson, rewrite_lesson_if_needed
 from pdf_generator import generate_lesson_pdf
+from database import DatabaseManager
 
 
 st.set_page_config(
@@ -17,6 +18,8 @@ st.set_page_config(
 )
 
 st.title("Capstone AI Teaching Assistant")
+
+db = DatabaseManager()
 
 uploaded_file = st.file_uploader(
     "Upload textbook PDF",
@@ -39,6 +42,12 @@ if uploaded_file is not None:
         )
         st.stop()
 
+    textbook_id = db.save_textbook(
+        filename=uploaded_file.name,
+        total_pages=len(pages),
+        total_chapters=len(chapters)
+    )
+
     st.success("Textbook processed successfully.")
 
     chapter_options = [
@@ -53,6 +62,11 @@ if uploaded_file is not None:
 
     selected_index = chapter_options.index(selected_chapter_label)
     selected_chapter = chapters[selected_index]
+
+    chapter_id = db.save_chapter(
+        textbook_id=textbook_id,
+        chapter=selected_chapter
+    )
 
     st.write(
         f"Selected: Chapter {selected_chapter['chapter_number']} — "
@@ -129,11 +143,25 @@ if uploaded_file is not None:
             output_path=output_path
         )
 
+        lesson_id = db.save_lesson(
+            chapter_id=chapter_id,
+            instructor_guide=instructor_guide,
+            output_path=output_path,
+            generation_model="gpt-5.5"
+        )
+
+        db.save_evaluation(
+            lesson_id=lesson_id,
+            evaluation=evaluation
+        )
+
         progress.progress(100)
         status.success("Lesson generated successfully.")
 
         st.subheader("Evaluation Results")
         st.json(evaluation)
+
+        st.success("Lesson and evaluation saved to MongoDB.")
 
         if was_rewritten:
             st.info("The lesson was automatically rewritten after evaluation.")

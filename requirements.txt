@@ -47,3 +47,4 @@ reportlab
 pillow
 
 tiktoken
+pymongo

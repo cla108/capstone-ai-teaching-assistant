@@ -13,7 +13,7 @@ The system combines local PDF processing, Retrieval-Augmented Generation (RAG), 
 - Automatic chapter extraction
 - Dynamic page offset detection
 - Recursive + Semantic Chunking
-- Vector database using FAISS
+- Vector database using FAISS #
 - Retrieval-Augmented Generation (RAG)
 - Instructor guide generation using GPT-5.5
 - Automatic lesson evaluation
@@ -47,7 +47,10 @@ Recursive + Semantic Chunking
 OpenAI Embeddings
  │
  ▼
-FAISS Vector Database
+FAISS
+ │
+ ▼
+Vector Database #needs to be added
  │
  ▼
 Semantic Retrieval (RAG)

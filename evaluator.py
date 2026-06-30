@@ -29,7 +29,7 @@ Pages: {chunk["start_page"]} to {chunk["end_page"]}
 def evaluate_lesson(
     instructor_guide,
     retrieved_chunks,
-    model="gpt-5.5"
+    model="gpt-4o-mini"
 ):
     """
     Evaluates generated lesson for:
@@ -185,7 +185,8 @@ ORIGINAL INSTRUCTOR GUIDE:
                 "role": "user",
                 "content": prompt
             }
-        ]
+        ],
+        temperature=0
     )
 
     return response.choices[0].message.content, True
