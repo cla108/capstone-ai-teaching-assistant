@@ -1,14 +1,5 @@
-import os
-
-from dotenv import load_dotenv
-from openai import OpenAI
-
-from example_loader import load_human_examples
-
-
-load_dotenv()
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+from config import OPENAI_PROVIDER
+from llm import chat_completion
 
 
 def build_context_from_chunks(chunks):
@@ -35,17 +26,16 @@ Pages: {chunk["start_page"]} to {chunk["end_page"]}
 def generate_instructor_guide(
     selected_chapter,
     retrieved_chunks,
-    teaching_style = "Practical and interactive",
-    model="gpt-5.5"
+    teaching_style="Practical and interactive",
+    provider=OPENAI_PROVIDER,
+    ollama_model=None
 ):
     """
-    Generates long-form instructor teaching notes using:
-    - textbook chunks as factual source
-    - human lesson examples as style guide
+    Generates long-form instructor teaching notes.
+    Supports OpenAI and Ollama through llm.py.
     """
 
     textbook_context = build_context_from_chunks(retrieved_chunks)
-    #human_examples = load_human_examples()
 
     prompt = f"""
 You are an expert lecturer, curriculum designer, and teaching assistant.
@@ -88,7 +78,7 @@ For each topic: • Explain the concept clearly. • State what the instructor s
 
 For each one, include: Name: What it shows: How the instructor should use it:
 
-6. Suggested Lecture Flow Create a timed lecture plan for.
+6. Suggested Lecture Flow Create a timed lecture plan for a 90-minute class.
 
 Use this format: Time: Topic: Instructor action: Student engagement/activity:
 
@@ -96,47 +86,35 @@ Use this format: Time: Topic: Instructor action: Student engagement/activity:
 
 For each activity: Activity name: Purpose: Instructions: Expected learning outcome:
 
-Discussion Questions Create discussion questions that encourage analysis and application.
+8. Discussion Questions Create discussion questions that encourage analysis and application.
 
-Quick Assessment / Quiz Questions Create quiz questions with answers.
+9. Quick Assessment / Quiz Questions Create quiz questions with answers.
 
 Include: • Definition questions • Concept questions • Application questions
 
 10. Case Study Guidance If the chapter includes a case study: • Identify the main issue. • Connect it to chapter concepts. • Suggest instructor questions. • Provide possible answer direction.
 
-Common Student Misunderstandings Identify confusing areas and explain how the instructor can clarify them.
+11. Common Student Misunderstandings Identify confusing areas and explain how the instructor can clarify them.
 
-Instructor Tips Give practical advice for teaching the chapter effectively.
+12. Instructor Tips Give practical advice for teaching the chapter effectively.
 
-Final Chapter Summary Summarize the most important takeaways.
+13. Final Chapter Summary Summarize the most important takeaways.
 
-𝐅𝐎𝐑𝐌𝐀𝐓𝐓𝐈𝐍𝐆 𝐑𝐔𝐋𝐄𝐒 — 𝐌𝐔𝐒𝐓 𝐅𝐎𝐋𝐋𝐎𝐖
+FORMATTING RULES — MUST FOLLOW
 
 The output must look like a polished, copy-and-paste-ready Word document.
 
 Do not use Markdown heading symbols such as #, ##, or ###.
 
-Do not use Markdown bold symbols such as bold.
+Do not use Markdown bold symbols such as **bold**.
 
 Do not use Markdown table formatting unless absolutely necessary.
 
-Use clean numbered section headings, such as:
+Use clean numbered section headings.
 
-Chapter Title
+Use lettered subheadings for major topics inside Section 4.
 
-Chapter Objectives
-
-Chapter Overview
-
-Make major section headings visually clear by using bold-style text where possible
-
-
-Use lettered subheadings for major topics inside Section 4
-
-
-Use simple bullet points with the bullet symbol:
-
-• First point • Second point • Third point
+Use simple bullet points with the bullet symbol: •
 
 Use clear spacing between sections and subsections.
 
@@ -144,37 +122,49 @@ Avoid dense paragraphs. Break long content into short, readable paragraphs.
 
 When listing textbook references, use this format:
 
-Figure/Table/Example Name What it shows: How to use it:
+Figure/Table/Example Name
+What it shows:
+How to use it:
 
 For lecture flow, use this format instead of tables:
 
-Time: 0 –10 minutes Topic: Introduction Instructor action: Explain the importance of the topic. Student engagement: Ask students an opening question.
+Time: 0–10 minutes
+Topic: Introduction
+Instructor action: Explain the importance of the topic.
+Student engagement: Ask students an opening question.
 
 For activities, use this format:
 
-Activity 1: Activity Name Purpose: Instructions: Expected learning outcome:
+Activity 1: Activity Name
+Purpose:
+Instructions:
+Expected learning outcome:
 
 For quiz questions, use this format:
 
 Definition Questions
 
-Question Answer:
+1. Question
+Answer:
 
-Question Answer:
+2. Question
+Answer:
 
 Concept Questions
 
-3. Question Answer:
+3. Question
+Answer:
 
 Application Questions
 
-4. Question Answer:
+4. Question
+Answer:
 
 Maintain a professional, clean, instructor-friendly tone.
 
 The final output should resemble a teaching handout or instructor manual, not a chat response.
 
-𝐂𝐎𝐍𝐓𝐄𝐍𝐓 𝐑𝐔𝐋𝐄𝐒
+CONTENT RULES
 
 Keep the tone professional, clear, and instructor-friendly.
 
@@ -195,33 +185,18 @@ Make the output practical for real classroom teaching.
 Before finalizing the answer, check that:
 
 • The document has all 13 required sections.
-
 • The formatting is clean and Word-ready.
-
 • There are no Markdown heading symbols.
-
 • There are no unnecessary asterisks.
-
 • Textbook references are only based on the provided chapter/context.
-
-• The lecture flow matches.
-
-• The guide is practical for an instructor to teach from
+• The guide is practical for an instructor to teach from.
 """
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a careful academic instructional design assistant."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-
+    return chat_completion(
+        provider=provider,
+        task="generation",
+        system_prompt="You are a careful academic instructional design assistant.",
+        user_prompt=prompt,
+        ollama_model=ollama_model,
+        temperature=0.3
     )
-
-    return response.choices[0].message.content

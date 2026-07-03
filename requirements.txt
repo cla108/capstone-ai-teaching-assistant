@@ -1,9 +1,19 @@
 # ============================================================
 # LessonPlan AI
 #
-# Setup
+# AI-powered Teaching Assistant
 #
-# 1. Create a virtual environment
+# Installation
+# ============================================================
+#
+# 1. Clone the repository
+#
+# git clone <repository-url>
+# cd LessonPlan_AI
+#
+# ------------------------------------------------------------
+#
+# 2. Create a virtual environment
 #
 # python -m venv .venv
 #
@@ -13,38 +23,121 @@
 # Windows
 # .venv\Scripts\activate
 #
-# 2. Install dependencies
+# ------------------------------------------------------------
+#
+# 3. Install dependencies
 #
 # pip install -r requirements.txt
 #
-# 3. Create a .env file
+# ------------------------------------------------------------
 #
-# OPENAI_API_KEY=your_api_key_here
+# 4. Create a .env file
 #
-# 4. Run
+# MongoDB (Required)
+#
+# MONGO_URI=mongodb://localhost:27017
+# MONGO_DB_NAME=lessonplan_ai
+#
+# OpenAI (Only required if using OpenAI mode)
+#
+# OPENAI_API_KEY=your_openai_api_key
+#
+# ------------------------------------------------------------
+#
+# 5. Start MongoDB
+#
+# If using Docker:
+#
+# docker compose up -d
+#
+# ------------------------------------------------------------
+#
+# 6. If using Ollama (Local AI)
+#
+# Install Ollama:
+#
+# https://ollama.com
+#
+# Download one or more supported models:
+#
+# ollama pull llama3.2:3b
+#
+# or
+#
+# ollama pull qwen2.5:7b
+#
+# Start Ollama:
+#
+# ollama serve
+#
+# NOTE:
+# The selected model MUST already be installed.
+#
+# ------------------------------------------------------------
+#
+# 7. Run the application
 #
 # streamlit run app.py
 #
 # ============================================================
 
+
+
+# ============================================================
+# Web Application
+# ============================================================
+
 streamlit
+
+
+# ============================================================
+# OpenAI
+# ============================================================
 
 openai
 python-dotenv
+tiktoken
+
+
+# ============================================================
+# Local AI (Ollama)
+# ============================================================
+
+sentence-transformers
+transformers
+torch
+torchvision
+
+
+# ============================================================
+# Vector Database
+# ============================================================
 
 numpy
 faiss-cpu
+
+
+# ============================================================
+# LangChain
+# ============================================================
 
 langchain
 langchain-openai
 langchain-experimental
 
+
+# ============================================================
+# PDF Processing
+# ============================================================
+
 pypdfium2
 PyMuPDF
-
 reportlab
-
 pillow
 
-tiktoken
+
+# ============================================================
+# Database
+# ============================================================
+
 pymongo

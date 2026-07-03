@@ -2,24 +2,26 @@
 
 LessonPlan AI is an AI-powered teaching assistant that automatically generates instructor-ready lesson guides from textbook chapters.
 
-The system combines local PDF processing, Retrieval-Augmented Generation (RAG), semantic search, and GPT-5.5 to transform textbook chapters into structured instructor guides.
+The system combines local PDF processing, Retrieval-Augmented Generation (RAG), recursive and semantic chunking, vector search with FAISS, GPT-5.5, and an automatic evaluation loop to produce high-quality instructor guides.
 
 ---
 
 # Features
 
 - Upload a textbook PDF
-- Automatic Table of Contents detection
+- Automatic Table of Contents (TOC) detection
 - Automatic chapter extraction
-- Dynamic page offset detection
+- Dynamic page mapping
 - Recursive + Semantic Chunking
-- Vector database using FAISS #
+- Semantic search using FAISS
 - Retrieval-Augmented Generation (RAG)
 - Instructor guide generation using GPT-5.5
 - Automatic lesson evaluation
 - Hallucination detection
 - Automatic lesson refinement
-- Export lesson guide as PDF
+- PDF export
+- MongoDB lesson storage
+- Dockerized MongoDB deployment
 
 ---
 
@@ -29,7 +31,7 @@ The system combines local PDF processing, Retrieval-Augmented Generation (RAG), 
 PDF
  │
  ▼
-Text Extraction
+Text Extraction (PyPDFium2)
  │
  ▼
 TOC Parsing
@@ -47,10 +49,7 @@ Recursive + Semantic Chunking
 OpenAI Embeddings
  │
  ▼
-FAISS
- │
- ▼
-Vector Database #needs to be added
+FAISS Vector Index
  │
  ▼
 Semantic Retrieval (RAG)
@@ -66,6 +65,9 @@ Automatic Rewrite (if required)
  │
  ▼
 PDF Export
+ │
+ ▼
+MongoDB Storage
 ```
 
 ---
@@ -79,6 +81,8 @@ PDF Export
 - text-embedding-3-small
 - FAISS
 - LangChain
+- MongoDB
+- Docker
 - PyPDFium2
 - ReportLab
 
@@ -101,7 +105,7 @@ python -m venv .venv
 
 Activate it.
 
-Linux/macOS
+Linux / macOS
 
 ```bash
 source .venv/bin/activate
@@ -121,17 +125,38 @@ pip install -r requirements.txt
 
 ---
 
+# MongoDB (Docker)
+
+Start MongoDB using Docker.
+
+```bash
+docker compose up -d
+```
+
+Verify that the container is running.
+
+```bash
+docker ps
+```
+
+---
+
 # OpenAI API Key
 
 Create a `.env` file in the project root.
 
-```
+```text
 OPENAI_API_KEY=your_api_key_here
+
+MONGO_URI=mongodb://localhost:27017
+MONGO_DB_NAME=lessonplan_ai
 ```
 
 The application uses:
 
 - GPT-5.5 for lesson generation
+- GPT-5.5 for lesson refinement
+- GPT-4o-mini for lesson evaluation
 - text-embedding-3-small for semantic embeddings
 
 ---
@@ -152,17 +177,18 @@ Run the complete pipeline test.
 python test_pipeline.py
 ```
 
-The test validates:
+The pipeline validates:
 
 - PDF extraction
 - TOC parsing
 - Chapter extraction
 - Recursive + semantic chunking
 - FAISS vector retrieval
-- Instructor guide generation
+- Lesson generation
 - Lesson evaluation
 - Automatic rewrite
 - PDF generation
+- MongoDB connectivity
 
 ---
 
@@ -177,27 +203,47 @@ The evaluator measures:
 - Structural completeness
 - Overall quality score
 
-If the lesson does not satisfy the quality thresholds, it is automatically rewritten before exporting the final PDF.
+Quality thresholds:
+
+- Maximum hallucination rate: **20%**
+- Minimum coverage score: **80%**
+
+If either threshold is not met, the lesson is automatically rewritten using the evaluator's feedback and evaluated again before being exported.
+
+---
+
+# Database
+
+MongoDB stores:
+
+- Uploaded textbooks
+- Extracted chapters
+- Generated lessons
+- Lesson evaluations
+
+This provides persistent storage and maintains a history of generated instructor guides without affecting the RAG pipeline.
 
 ---
 
 # Current Version
 
-Version 1.0
+Version 1.1
 
 Implemented:
 
 - Local PDF processing
 - Automatic TOC parsing
 - Dynamic chapter extraction
-- Recursive + Semantic Chunking
-- RAG
-- Few-shot prompting
+- Recursive + semantic chunking
+- FAISS vector search
+- Retrieval-Augmented Generation (RAG)
 - GPT-5.5 lesson generation
-- Automatic evaluation
+- Automatic lesson evaluation
 - Hallucination detection
 - Automatic lesson refinement
 - PDF export
+- MongoDB integration
+- Docker deployment
 
 ---
 
@@ -205,17 +251,22 @@ Implemented:
 
 - Local embedding models
 - Local language models
+- FAISS index persistence
 - Automatic figure and table extraction
 - Citation-aware lesson generation
 - Multi-chapter lesson generation
 - Interactive instructor editing
+- Lesson version comparison
 
 ---
 
-# Author
+# Authors
 
-Clara Castro, Ebuka Onuoha
+Clara Castro
+Ebuka Onuoha
 
 Capstone Project
+
+Post-Degree Diploma in Data Analytics
 
 Langara College

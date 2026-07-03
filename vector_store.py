@@ -4,13 +4,14 @@ import hashlib
 
 import faiss
 import numpy as np
-from dotenv import load_dotenv
-from openai import OpenAI
 
+from config import OPENAI_PROVIDER
+from embeddings import (
+    embed_text,
+    embed_texts,
+    get_embedding_dimension,
+)
 
-load_dotenv()
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 CACHE_DIR = "outputs/cache/embeddings"
 os.makedirs(CACHE_DIR, exist_ok=True)
@@ -18,16 +19,21 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 
 class VectorStore:
     """
-    FAISS vector store with batched OpenAI embeddings and local caching.
+    FAISS vector store with provider-based embeddings.
+    Supports:
+    - OpenAI embeddings
+    - Local SentenceTransformer embeddings for Ollama mode
     """
 
-    def __init__(self):
-        self.dimension = 1536
+    def __init__(self, provider=OPENAI_PROVIDER):
+        self.provider = provider
+        self.dimension = get_embedding_dimension(provider)
         self.index = faiss.IndexFlatIP(self.dimension)
         self.chunks = []
 
     def _cache_path(self, text):
-        key = hashlib.md5(text.encode("utf-8")).hexdigest()
+        key_source = f"{self.provider}_{text}"
+        key = hashlib.md5(key_source.encode("utf-8")).hexdigest()
         return os.path.join(CACHE_DIR, f"{key}.json")
 
     def get_embedding(self, text):
@@ -37,17 +43,12 @@ class VectorStore:
             with open(cache_path, "r", encoding="utf-8") as file:
                 return np.array(json.load(file), dtype="float32")
 
-        response = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=text
-        )
-
-        embedding = response.data[0].embedding
+        embedding = embed_text(text, self.provider)
 
         with open(cache_path, "w", encoding="utf-8") as file:
-            json.dump(embedding, file)
+            json.dump(embedding.tolist(), file)
 
-        return np.array(embedding, dtype="float32")
+        return embedding
 
     def get_embeddings_batch(self, texts):
         embeddings = []
@@ -59,30 +60,31 @@ class VectorStore:
 
             if os.path.exists(cache_path):
                 with open(cache_path, "r", encoding="utf-8") as file:
-                    embeddings.append(np.array(json.load(file), dtype="float32"))
+                    embeddings.append(
+                        np.array(json.load(file), dtype="float32")
+                    )
             else:
                 embeddings.append(None)
                 uncached_texts.append(text)
                 uncached_indices.append(index)
 
         if uncached_texts:
-            response = client.embeddings.create(
-                model="text-embedding-3-small",
-                input=uncached_texts
+            new_embeddings = embed_texts(
+                uncached_texts,
+                self.provider
             )
 
-            for response_item, original_index, text in zip(
-                response.data,
+            for embedding, original_index, text in zip(
+                new_embeddings,
                 uncached_indices,
                 uncached_texts
             ):
-                embedding = response_item.embedding
-                embeddings[original_index] = np.array(embedding, dtype="float32")
+                embeddings[original_index] = embedding
 
                 cache_path = self._cache_path(text)
 
                 with open(cache_path, "w", encoding="utf-8") as file:
-                    json.dump(embedding, file)
+                    json.dump(embedding.tolist(), file)
 
         return embeddings
 

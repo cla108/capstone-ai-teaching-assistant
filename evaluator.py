@@ -1,12 +1,7 @@
 import json
-import os
 
-from dotenv import load_dotenv
-from openai import OpenAI
-
-
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+from config import OPENAI_PROVIDER
+from llm import chat_completion
 
 
 def build_context_from_chunks(chunks):
@@ -26,10 +21,28 @@ Pages: {chunk["start_page"]} to {chunk["end_page"]}
     return "\n\n".join(context_parts)
 
 
+def extract_json(raw_output):
+    """
+    Attempts to parse model output as JSON.
+    Handles cases where the model wraps JSON in markdown fences.
+    """
+
+    cleaned = raw_output.strip()
+
+    if cleaned.startswith("```json"):
+        cleaned = cleaned.replace("```json", "").replace("```", "").strip()
+
+    elif cleaned.startswith("```"):
+        cleaned = cleaned.replace("```", "").strip()
+
+    return json.loads(cleaned)
+
+
 def evaluate_lesson(
     instructor_guide,
     retrieved_chunks,
-    model="gpt-4o-mini"
+    provider=OPENAI_PROVIDER,
+    ollama_model=None
 ):
     """
     Evaluates generated lesson for:
@@ -92,25 +105,18 @@ GENERATED INSTRUCTOR GUIDE:
 {instructor_guide}
 """
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a strict academic content evaluator."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
+    raw_output = chat_completion(
+        provider=provider,
+        task="evaluation",
+        system_prompt="You are a strict academic content evaluator.",
+        user_prompt=prompt,
+        ollama_model=ollama_model,
+        temperature=0
     )
 
-    raw_output = response.choices[0].message.content
-
     try:
-        return json.loads(raw_output)
-    except json.JSONDecodeError:
+        return extract_json(raw_output)
+    except Exception:
         return {
             "total_factual_claims": None,
             "supported_claims": None,
@@ -130,7 +136,8 @@ def rewrite_lesson_if_needed(
     instructor_guide,
     retrieved_chunks,
     evaluation,
-    model="gpt-5.5",
+    provider=OPENAI_PROVIDER,
+    ollama_model=None,
     hallucination_threshold=0.20,
     coverage_threshold=0.80
 ):
@@ -174,19 +181,13 @@ ORIGINAL INSTRUCTOR GUIDE:
 {instructor_guide}
 """
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a careful academic lesson editor."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        temperature=0
+    rewritten = chat_completion(
+        provider=provider,
+        task="rewrite",
+        system_prompt="You are a careful academic lesson editor.",
+        user_prompt=prompt,
+        ollama_model=ollama_model,
+        temperature=0.2
     )
 
-    return response.choices[0].message.content, True
+    return rewritten, True

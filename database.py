@@ -3,6 +3,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from pymongo.errors import ServerSelectionTimeoutError
 
 load_dotenv()
 
@@ -11,13 +12,35 @@ class DatabaseManager:
 
     def __init__(self):
 
-        self.client = MongoClient(
-            os.getenv("MONGO_URI")
+        mongo_uri = os.getenv(
+            "MONGO_URI",
+            "mongodb://localhost:27017"
         )
 
-        self.db = self.client[
-            os.getenv("MONGO_DB_NAME")
-        ]
+        mongo_db = os.getenv(
+            "MONGO_DB_NAME",
+            "lessonplan_ai"
+        )
+
+        self.client = MongoClient(
+            mongo_uri,
+            serverSelectionTimeoutMS=5000
+        )
+
+        try:
+            # Test the connection immediately
+            self.client.admin.command("ping")
+
+        except ServerSelectionTimeoutError:
+
+            raise RuntimeError(
+                "\nUnable to connect to MongoDB.\n\n"
+                "Make sure MongoDB is running.\n\n"
+                "If using Docker:\n"
+                "docker compose up -d\n"
+            )
+
+        self.db = self.client[mongo_db]
 
         self.textbooks = self.db["textbooks"]
         self.chapters = self.db["chapters"]
@@ -85,11 +108,8 @@ class DatabaseManager:
     ):
 
         existing = self.get_chapter(
-
             textbook_id,
-
             chapter["chapter_number"]
-
         )
 
         if existing:
@@ -118,17 +138,11 @@ class DatabaseManager:
     ####################################################
 
     def save_lesson(
-
         self,
-
         chapter_id,
-
         instructor_guide,
-
         output_path,
-
         generation_model
-
     ):
 
         result = self.lessons.insert_one({
@@ -152,17 +166,12 @@ class DatabaseManager:
     ####################################################
 
     def save_evaluation(
-
         self,
-
         lesson_id,
-
         evaluation
-
     ):
 
         evaluation["lesson_id"] = lesson_id
-
         evaluation["created_at"] = datetime.utcnow()
 
         self.evaluations.insert_one(
