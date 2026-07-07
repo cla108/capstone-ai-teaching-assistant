@@ -11,11 +11,7 @@ from evaluator import evaluate_lesson, rewrite_lesson_if_needed
 from pdf_generator import generate_lesson_pdf
 from database import DatabaseManager
 
-from config import (
-    OPENAI_PROVIDER,
-    OLLAMA_PROVIDER,
-    OLLAMA_MODELS
-)
+from config import OPENAI_PROVIDER
 
 
 st.set_page_config(
@@ -31,34 +27,13 @@ st.title("Capstone AI Teaching Assistant")
 
 db = DatabaseManager()
 
-# ==========================================================
-# SIDEBAR
-# ==========================================================
-
-st.sidebar.header("AI Configuration")
-
-provider = st.sidebar.radio(
-    "Execution Mode",
-    [OPENAI_PROVIDER, OLLAMA_PROVIDER],
-    index=0
+st.title("Capstone AI Teaching Assistant")
+st.caption(
+    "Generate instructor-ready lesson guides using Retrieval-Augmented Generation (RAG)."
 )
 
+provider = OPENAI_PROVIDER
 ollama_model = None
-
-if provider == OLLAMA_PROVIDER:
-
-    ollama_label = st.sidebar.selectbox(
-        "Local Model",
-        list(OLLAMA_MODELS.keys())
-    )
-
-    ollama_model = OLLAMA_MODELS[ollama_label]
-
-    st.sidebar.success("Running locally with Ollama")
-
-else:
-
-    st.sidebar.success("Running with OpenAI GPT")
 
 # ==========================================================
 # FILE UPLOAD
@@ -323,11 +298,7 @@ if uploaded_file is not None:
 
             output_path=output_path,
 
-            generation_model=(
-                ollama_model
-                if provider == OLLAMA_PROVIDER
-                else "gpt-5.5"
-            )
+            generation_model="gpt-5.5"
 
         )
 
