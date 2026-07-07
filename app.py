@@ -21,13 +21,23 @@ st.set_page_config(
 
 st.title("Capstone AI Teaching Assistant")
 
+st.caption(
+    "Generate instructor-ready lesson guides using Retrieval-Augmented Generation (RAG)."
+)
+
 # ==========================================================
 # DATABASE
 # ==========================================================
 
-db = DatabaseManager()
+try:
+    db = DatabaseManager()
+    database_enabled = True
 
-st.title("Capstone AI Teaching Assistant")
+except Exception:
+    db = None
+    database_enabled = False
+
+
 st.caption(
     "Generate instructor-ready lesson guides using Retrieval-Augmented Generation (RAG)."
 )
@@ -67,15 +77,20 @@ if uploaded_file is not None:
 
         st.stop()
 
-    textbook_id = db.save_textbook(
 
-        filename=uploaded_file.name,
 
-        total_pages=len(pages),
+    if database_enabled:
+        textbook_id = db.save_textbook(
+                filename=uploaded_file.name,
 
-        total_chapters=len(chapters)
+            total_pages=len(pages),
 
-    )
+            total_chapters=len(chapters)
+        )
+    else:
+        textbook_id = None
+
+
 
     st.success("Textbook processed successfully.")
 
@@ -100,14 +115,19 @@ if uploaded_file is not None:
     )
 
     selected_chapter = chapters[selected_index]
+    if database_enabled:
 
-    chapter_id = db.save_chapter(
+        chapter_id = db.save_chapter(
 
-        textbook_id=textbook_id,
+            textbook_id=textbook_id,
 
-        chapter=selected_chapter
+            chapter=selected_chapter
 
-    )
+        )
+
+    else:
+
+        chapter_id = None
 
     st.write(
 
@@ -286,29 +306,31 @@ if uploaded_file is not None:
 
         )
 
+                # -------------------------
+        # Database (Optional)
         # -------------------------
-        # Database
-        # -------------------------
 
-        lesson_id = db.save_lesson(
+        if database_enabled:
 
-            chapter_id=chapter_id,
+            lesson_id = db.save_lesson(
 
-            instructor_guide=instructor_guide,
+                chapter_id=chapter_id,
 
-            output_path=output_path,
+                instructor_guide=instructor_guide,
 
-            generation_model="gpt-5.5"
+                output_path=output_path,
 
-        )
+                generation_model="gpt-5.5"
 
-        db.save_evaluation(
+            )
 
-            lesson_id=lesson_id,
+            db.save_evaluation(
 
-            evaluation=evaluation
+                lesson_id=lesson_id,
 
-        )
+                evaluation=evaluation
+
+            )
 
         progress.progress(100)
 
@@ -322,9 +344,17 @@ if uploaded_file is not None:
 
         st.json(evaluation)
 
-        st.success(
-            "Lesson and evaluation saved to MongoDB."
-        )
+        if database_enabled:
+
+            st.success(
+                "Lesson and evaluation saved to MongoDB."
+            )
+
+        else:
+
+            st.info(
+                "Running in demo mode. MongoDB is not connected, so the lesson was not saved."
+            )
 
         if was_rewritten:
 
@@ -347,8 +377,8 @@ if uploaded_file is not None:
                 data=pdf_file,
 
                 file_name=(
-                    f"chapter_{selected_chapter['chapter_number']}_"
-                    f"instructor_guide.pdf"
+                    f"chapter_{selected_chapter['chapter_number']}"
+                    f"_instructor_guide.pdf"
                 ),
 
                 mime="application/pdf"
