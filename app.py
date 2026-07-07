@@ -38,9 +38,6 @@ except Exception:
     database_enabled = False
 
 
-st.caption(
-    "Generate instructor-ready lesson guides using Retrieval-Augmented Generation (RAG)."
-)
 
 provider = OPENAI_PROVIDER
 ollama_model = None
