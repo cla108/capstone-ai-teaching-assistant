@@ -6,7 +6,7 @@ import faiss
 import numpy as np
 
 from config import OPENAI_PROVIDER
-from embeddings import (
+from ai.embeddings import (
     embed_text,
     embed_texts,
     get_embedding_dimension,

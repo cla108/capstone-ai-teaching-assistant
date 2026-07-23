@@ -5,3 +5,4 @@ venv/
 .streamlit/
 *.pdf
 outputs/
+.DS_Store

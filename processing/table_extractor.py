@@ -198,3 +198,58 @@ def extract_boxed_objects_as_images(
     pdf.close()
 
     return extracted_objects
+
+
+
+
+
+def extract_chapter_text(pages, chapter):
+    """
+    Extract full chapter text from PDF pages.
+    """
+
+    selected_pages = []
+
+    pdf_start = chapter["pdf_start_page"]
+    pdf_end = chapter["pdf_end_page"]
+
+    for page in pages:
+        page_number = page["page_number"]
+
+        if pdf_end is None:
+            is_inside_chapter = page_number >= pdf_start
+        else:
+            is_inside_chapter = (
+                page_number >= pdf_start
+                and page_number <= pdf_end
+            )
+
+        if is_inside_chapter:
+            selected_pages.append(page["text"])
+
+    chapter_copy = chapter.copy()
+    chapter_copy["text"] = "\n".join(selected_pages)
+
+    return chapter_copy
+def extract_all_chapters_text(pages, chapters):
+    """
+    Extract text for all chapters.
+
+    Parameters
+    ----------
+    pages : list
+        PDF pages extracted from the textbook.
+
+    chapters : list
+        Chapter metadata with PDF page ranges.
+
+    Returns
+    -------
+    list
+        Chapters including extracted text.
+    """
+
+    return [
+        extract_chapter_text(pages, chapter)
+        for chapter in chapters
+    ]

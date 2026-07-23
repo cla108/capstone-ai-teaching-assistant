@@ -1,4 +1,4 @@
-from pdf_processor import extract_text_from_pdf
+from processing.pdf_processor import extract_text_from_pdf
 
 PDF_PATH = input("PDF path: ").strip()
 

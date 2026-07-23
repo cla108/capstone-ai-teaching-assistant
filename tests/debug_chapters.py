@@ -1,6 +1,6 @@
-from pdf_processor import extract_text_from_pdf, combine_pages
-from toc_parser import extract_toc_lines, normalize_toc_lines, parse_toc
-from chapter_extractor import flatten_chapters, extract_chapters_from_pages
+from processing.pdf_processor import extract_text_from_pdf, combine_pages
+from processing.toc_parser import extract_toc_lines, normalize_toc_lines, parse_toc
+from processing.chapter_extractor import flatten_chapters, extract_chapters_from_pages
 
 PDF_PATH = input("PDF path: ").strip()
 

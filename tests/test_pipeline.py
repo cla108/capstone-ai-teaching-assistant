@@ -1,14 +1,14 @@
 import os
 import sys
 
-from pdf_processor import extract_text_from_pdf, combine_pages
-from toc_parser import extract_toc_lines, parse_toc
-from chapter_extractor import extract_chapters_from_pages
-from chunker import create_chapter_chunks
-from vector_store import VectorStore
-from lesson_generator import generate_instructor_guide
-from evaluator import evaluate_lesson, rewrite_lesson_if_needed
-from pdf_generator import generate_lesson_pdf
+from processing.pdf_processor import extract_text_from_pdf, combine_pages
+from processing.toc_parser import extract_toc_lines, parse_toc
+from processing.chapter_extractor import extract_chapters_from_pages
+from processing.chunker import create_chapter_chunks
+from ai.vector_store import VectorStore
+from ai.lesson_generator import generate_instructor_guide
+from ai.evaluator import evaluate_lesson, rewrite_lesson_if_needed
+from services.pdf_generator import generate_lesson_pdf
 
 
 def main():

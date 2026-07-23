@@ -1,7 +1,8 @@
 import json
+from typing import Dict, Any, List, Union
 
 from config import OPENAI_PROVIDER
-from llm import chat_completion
+from ai.llm import chat_completion
 
 
 def build_context_from_chunks(chunks):
@@ -36,6 +37,50 @@ def extract_json(raw_output):
         cleaned = cleaned.replace("```", "").strip()
 
     return json.loads(cleaned)
+
+
+def normalize_evaluation(eval_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize evaluation data to ensure consistent types.
+    """
+    normalized = {}
+
+    # Numeric fields with default values
+    numeric_fields = [
+        "total_factual_claims",
+        "supported_claims",
+        "partially_supported_claims",
+        "unsupported_claims",
+        "hallucination_rate",
+        "coverage_score",
+        "structure_score",
+        "overall_score"
+    ]
+
+    for field in numeric_fields:
+        value = eval_data.get(field, 0)
+        if isinstance(value, list):
+            # If it's a list, try to get the first element or default to 0
+            value = value[0] if value else 0
+        try:
+            normalized[field] = float(value)
+        except (ValueError, TypeError):
+            normalized[field] = 0.0
+
+    # List fields
+    list_fields = ["missing_concepts", "unsupported_claim_examples"]
+    for field in list_fields:
+        value = eval_data.get(field, [])
+        if not isinstance(value, list):
+            value = [value] if value else []
+        normalized[field] = value
+
+    # Feedback field
+    normalized["feedback"] = eval_data.get("feedback", "")
+    if not isinstance(normalized["feedback"], str):
+        normalized["feedback"] = str(normalized["feedback"])
+
+    return normalized
 
 
 def evaluate_lesson(
@@ -115,20 +160,23 @@ GENERATED INSTRUCTOR GUIDE:
     )
 
     try:
-        return extract_json(raw_output)
-    except Exception:
+        eval_data = extract_json(raw_output)
+        # Normalize the evaluation data
+        return normalize_evaluation(eval_data)
+    except Exception as e:
+        # Return default structure with error feedback
         return {
-            "total_factual_claims": None,
-            "supported_claims": None,
-            "partially_supported_claims": None,
-            "unsupported_claims": None,
-            "hallucination_rate": None,
-            "coverage_score": None,
-            "structure_score": None,
-            "overall_score": None,
+            "total_factual_claims": 0,
+            "supported_claims": 0,
+            "partially_supported_claims": 0,
+            "unsupported_claims": 0,
+            "hallucination_rate": 0.0,
+            "coverage_score": 0.0,
+            "structure_score": 0.0,
+            "overall_score": 0.0,
             "missing_concepts": [],
             "unsupported_claim_examples": [],
-            "feedback": raw_output
+            "feedback": f"Error parsing evaluation: {str(e)}. Raw output: {raw_output[:500]}..."
         }
 
 
@@ -145,15 +193,15 @@ def rewrite_lesson_if_needed(
     Rewrites the lesson if hallucination is too high or coverage is too low.
     """
 
-    hallucination_rate = evaluation.get("hallucination_rate")
-    coverage_score = evaluation.get("coverage_score")
+    hallucination_rate = evaluation.get("hallucination_rate", 0)
+    coverage_score = evaluation.get("coverage_score", 0)
 
     needs_rewrite = False
 
-    if hallucination_rate is not None and hallucination_rate > hallucination_threshold:
+    if hallucination_rate > hallucination_threshold:
         needs_rewrite = True
 
-    if coverage_score is not None and coverage_score < coverage_threshold:
+    if coverage_score < coverage_threshold:
         needs_rewrite = True
 
     if not needs_rewrite:
@@ -172,7 +220,7 @@ Rules:
 - Do not add external examples or textbook-specific facts that are not in the chunks.
 
 EVALUATOR FEEDBACK:
-{evaluation}
+{json.dumps(evaluation, indent=2)}
 
 RETRIEVED TEXTBOOK CONTENT:
 {context}

@@ -1,4 +1,3 @@
-
 import re
 
 
@@ -197,12 +196,50 @@ def parse_toc(toc_lines):
     current_part = None
     current_chapter = None
 
-    part_pattern = re.compile(r"^Part\s+([IVXLC]+)\s*(.*)$", re.IGNORECASE)
-    chapter_pattern = re.compile(
-        r"^Chapter\s+(\d+)\s+(.+?)\s+(\d+)$",
+    part_patterns = [
+        re.compile(
+            r"^Module\s+([IVXLC\d]+)\s*(.*)$",
+            re.IGNORECASE
+        ),
+        re.compile(
+            r"^Part\s+([IVXLC]+)\s*(.*)$",
+            re.IGNORECASE
+        ),
+        re.compile(
+            r"^Part\s+([A-Za-z0-9IVXLC]+)\s*(.*)$",
+            re.IGNORECASE
+        ),
+        re.compile(
+            r"^Unit\s+([IVXLC\d]+)\s*(.*)$",
+            re.IGNORECASE
+        ),
+    ]
+
+    chapter_patterns = [
+        # Chapter 1 Title ............ 35
+        re.compile(
+            r"^Chapter\s+(\d+)\s+(.+?)\s+(\d+)$",
+            re.IGNORECASE
+        ),
+        # CHAPTER 1 Title ............ 35
+        re.compile(
+            r"^CHAPTER\s+(\d+)\s+(.+?)\s+(\d+)$",
+            re.IGNORECASE
+        ),
+        # 1 Title ............ 35
+        re.compile(
+            r"^(\d+)\s+(.+?)\s+(\d+)$"
+        ),
+        # 01 Title ............ 35
+        re.compile(
+            r"^0*(\d+)\s+(.+?)\s+(\d+)$"
+        ),
+    ]
+
+    section_pattern = re.compile(
+        r"^(?:(?:Section|SECTION)\s+\d+(?:\.\d+)?\s+)?(.+?)\s+(\d+)$",
         re.IGNORECASE
     )
-    section_pattern = re.compile(r"^(.+?)\s+(\d+)$")
 
     ignored_starts = (
         "Preface",
@@ -216,7 +253,14 @@ def parse_toc(toc_lines):
     )
 
     for entry in entries:
-        part_match = part_pattern.match(entry)
+        part_match = None
+        entry = re.sub(r"\.{2,}", " ", entry)
+        entry = re.sub(r"\s+", " ", entry).strip()
+
+        for pattern in part_patterns:
+            part_match = pattern.match(entry)
+            if part_match:
+                break
 
         if part_match:
             current_part = {
@@ -231,14 +275,11 @@ def parse_toc(toc_lines):
             current_chapter = None
             continue
 
-
-
-
-        chapter_match = chapter_pattern.match(entry)
-
-
-
-
+        chapter_match = None
+        for pattern in chapter_patterns:
+            chapter_match = pattern.match(entry)
+            if chapter_match:
+                break
 
         if chapter_match:
             chapter_title = chapter_match.group(2).strip()
@@ -265,12 +306,6 @@ def parse_toc(toc_lines):
                 "start_page": start_page,
                 "sections": []
             }
-
-
-
-
-
-
 
             if current_part is None:
                 current_part = {

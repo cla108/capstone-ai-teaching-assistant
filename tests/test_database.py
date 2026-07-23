@@ -1,4 +1,4 @@
-from database import DatabaseManager
+from database.database import DatabaseManager
 
 db = DatabaseManager()
 
