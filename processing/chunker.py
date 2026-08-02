@@ -11,6 +11,7 @@ from langchain_openai import OpenAIEmbeddings
 load_dotenv()
 
 CACHE_DIR = "outputs/cache/chunks"
+CACHE_VERSION = "chapter-safe-v2"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 
@@ -40,11 +41,26 @@ def force_split_words(text, max_words):
 
 
 def get_cache_path(chapter, max_words, overlap_words):
+    """
+    Cache by the complete chapter text and verified physical page range.
+
+    This prevents stale chunks from being reused after chapter boundaries
+    have been corrected.
+    """
+
+    text_hash = hashlib.sha256(
+        chapter["text"].encode("utf-8")
+    ).hexdigest()
+
     raw_key = (
-        f"{chapter['chapter_number']}_"
-        f"{chapter['chapter_title']}_"
-        f"{chapter['text'][:1000]}_"
-        f"{max_words}_{overlap_words}"
+        f"{CACHE_VERSION}|"
+        f"{chapter['chapter_number']}|"
+        f"{chapter['chapter_title']}|"
+        f"{chapter.get('pdf_start_page')}|"
+        f"{chapter.get('pdf_end_page')}|"
+        f"{text_hash}|"
+        f"{max_words}|"
+        f"{overlap_words}"
     )
 
     key = hashlib.md5(raw_key.encode("utf-8")).hexdigest()
@@ -52,11 +68,6 @@ def get_cache_path(chapter, max_words, overlap_words):
 
 
 def semantic_split_large_text(text):
-    """
-    Uses LangChain SemanticChunker only for large blocks.
-    This keeps semantic chunking but avoids applying it to the whole chapter.
-    """
-
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
     splitter = SemanticChunker(
@@ -78,14 +89,6 @@ def recursive_semantic_split(
     max_words=500,
     semantic_trigger_words=900
 ):
-    """
-    Hybrid chunking:
-    1. Split by paragraphs first.
-    2. Keep paragraphs together when possible.
-    3. If a block is too large, apply semantic chunking.
-    4. If still too large, force split by word count.
-    """
-
     text = clean_text(text)
     paragraphs = split_into_paragraphs(text)
 
@@ -110,10 +113,20 @@ def recursive_semantic_split(
                 if count_words(semantic_chunk) <= max_words:
                     chunks.append(semantic_chunk)
                 else:
-                    chunks.extend(force_split_words(semantic_chunk, max_words))
+                    chunks.extend(
+                        force_split_words(
+                            semantic_chunk,
+                            max_words,
+                        )
+                    )
 
         elif count_words(paragraph) > max_words:
-            chunks.extend(force_split_words(paragraph, max_words))
+            chunks.extend(
+                force_split_words(
+                    paragraph,
+                    max_words,
+                )
+            )
 
         else:
             current_block = paragraph
@@ -151,20 +164,18 @@ def create_chapter_chunks(
     overlap_words=75,
     semantic_trigger_words=900
 ):
-    """
-    Creates recursive + semantic chunks.
+    """Create chunks for exactly one verified chapter."""
 
-    Recursive:
-    - keeps paragraph structure where possible
+    if not chapter.get("text", "").strip():
+        raise ValueError(
+            "The selected chapter contains no extracted text."
+        )
 
-    Semantic:
-    - uses LangChain SemanticChunker only for large blocks
-
-    Cached:
-    - repeated runs on the same chapter are much faster
-    """
-
-    cache_path = get_cache_path(chapter, max_words, overlap_words)
+    cache_path = get_cache_path(
+        chapter,
+        max_words,
+        overlap_words,
+    )
 
     if os.path.exists(cache_path):
         with open(cache_path, "r", encoding="utf-8") as file:
@@ -182,17 +193,27 @@ def create_chapter_chunks(
     )
 
     chunks = []
+    chapter_key = (
+        f"{chapter['chapter_number']}|"
+        f"{chapter['chapter_title']}|"
+        f"{chapter.get('pdf_start_page')}|"
+        f"{chapter.get('pdf_end_page')}"
+    )
 
     for index, text in enumerate(base_chunks, start=1):
         chunks.append({
             "chunk_id": index,
+            "chapter_key": chapter_key,
             "chapter_number": chapter["chapter_number"],
             "chapter_title": chapter["chapter_title"],
-            "start_page": chapter["start_page"],
-            "end_page": chapter["end_page"],
+            "start_page": chapter.get("start_page"),
+            "end_page": chapter.get("end_page"),
             "pdf_start_page": chapter.get("pdf_start_page"),
             "pdf_end_page": chapter.get("pdf_end_page"),
-            "chunking_method": "recursive paragraph chunking + semantic chunking for large blocks",
+            "chunking_method": (
+                "recursive paragraph chunking + "
+                "semantic chunking for large blocks"
+            ),
             "word_count": count_words(text),
             "text": text
         })

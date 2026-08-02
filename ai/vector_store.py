@@ -20,9 +20,8 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 class VectorStore:
     """
     FAISS vector store with provider-based embeddings.
-    Supports:
-    - OpenAI embeddings
-    - Local SentenceTransformer embeddings for Ollama mode
+
+    Retrieval can be restricted to one chapter through chunk metadata.
     """
 
     def __init__(self, provider=OPENAI_PROVIDER):
@@ -41,7 +40,10 @@ class VectorStore:
 
         if os.path.exists(cache_path):
             with open(cache_path, "r", encoding="utf-8") as file:
-                return np.array(json.load(file), dtype="float32")
+                return np.array(
+                    json.load(file),
+                    dtype="float32",
+                )
 
         embedding = embed_text(text, self.provider)
 
@@ -61,7 +63,10 @@ class VectorStore:
             if os.path.exists(cache_path):
                 with open(cache_path, "r", encoding="utf-8") as file:
                     embeddings.append(
-                        np.array(json.load(file), dtype="float32")
+                        np.array(
+                            json.load(file),
+                            dtype="float32",
+                        )
                     )
             else:
                 embeddings.append(None)
@@ -92,22 +97,65 @@ class VectorStore:
         if not chunks:
             return
 
+        for chunk in chunks:
+            if "chapter_number" not in chunk:
+                raise ValueError(
+                    "Every vector-store chunk must contain "
+                    "'chapter_number' metadata."
+                )
+
         texts = [chunk["text"] for chunk in chunks]
         embeddings = self.get_embeddings_batch(texts)
 
-        embeddings_matrix = np.vstack(embeddings).astype("float32")
+        embeddings_matrix = np.vstack(
+            embeddings
+        ).astype("float32")
+
         faiss.normalize_L2(embeddings_matrix)
 
         self.index.add(embeddings_matrix)
         self.chunks.extend(chunks)
 
-    def search(self, query, k=5):
+    def search(
+        self,
+        query,
+        k=5,
+        *,
+        chapter_number=None,
+    ):
+        """
+        Search for relevant chunks.
+
+        When chapter_number is supplied, results from every other chapter are
+        removed before returning the top-k chunks.
+        """
+
+        if k <= 0 or self.index.ntotal == 0:
+            return []
+
         query_embedding = self.get_embedding(query)
-        query_matrix = np.array([query_embedding], dtype="float32")
+        query_matrix = np.array(
+            [query_embedding],
+            dtype="float32",
+        )
 
         faiss.normalize_L2(query_matrix)
 
-        scores, indices = self.index.search(query_matrix, k)
+        if chapter_number is None:
+            search_k = min(k, self.index.ntotal)
+        else:
+            search_k = self.index.ntotal
+
+        scores, indices = self.index.search(
+            query_matrix,
+            search_k,
+        )
+
+        required_chapter = (
+            None
+            if chapter_number is None
+            else str(chapter_number).strip().casefold()
+        )
 
         results = []
 
@@ -116,7 +164,19 @@ class VectorStore:
                 continue
 
             result = self.chunks[idx].copy()
+
+            if required_chapter is not None:
+                result_chapter = str(
+                    result.get("chapter_number", "")
+                ).strip().casefold()
+
+                if result_chapter != required_chapter:
+                    continue
+
             result["similarity_score"] = float(score)
             results.append(result)
+
+            if len(results) >= k:
+                break
 
         return results

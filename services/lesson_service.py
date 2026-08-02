@@ -25,20 +25,18 @@ def generate_complete_lesson(
     """
     Complete lesson generation pipeline.
 
-    Returns
-    -------
-    dict
-        {
-            "chunks": ...,
-            "retrieved_chunks": ...,
-            "lesson": ...,
-            "evaluation": ...
-        }
+    Only chunks belonging to the selected chapter are indexed and retrieved.
     """
 
-    # --------------------------------------------------
-    # Create chunks
-    # --------------------------------------------------
+    if not selected_chapter:
+        raise ValueError("No chapter was selected.")
+
+    if not selected_chapter.get("text", "").strip():
+        raise ValueError(
+            "The selected chapter has no extracted text."
+        )
+
+    selected_number = selected_chapter["chapter_number"]
 
     chunks = create_chapter_chunks(
         selected_chapter,
@@ -46,9 +44,18 @@ def generate_complete_lesson(
         overlap_words=75,
     )
 
-    # --------------------------------------------------
-    # Build vector store
-    # --------------------------------------------------
+    invalid_chunks = [
+        chunk
+        for chunk in chunks
+        if str(chunk.get("chapter_number")).strip().casefold()
+        != str(selected_number).strip().casefold()
+    ]
+
+    if invalid_chunks:
+        raise ValueError(
+            "Chunk metadata contains chapters other than the "
+            "selected chapter."
+        )
 
     vector_store = VectorStore(
         provider=provider
@@ -56,24 +63,25 @@ def generate_complete_lesson(
 
     vector_store.add_chunks(chunks)
 
-    # --------------------------------------------------
-    # Retrieve context
-    # --------------------------------------------------
-
     lesson_query = (
-        f"Create instructor guide for "
+        f"Create {output_type} for "
         f"Chapter {selected_chapter['chapter_number']}: "
-        f"{selected_chapter['chapter_title']}"
+        f"{selected_chapter['chapter_title']}. "
+        f"Difficulty: {difficulty}. "
+        f"Lesson duration: {lesson_duration}. "
+        f"Teaching style: {teaching_style}."
     )
 
     retrieved_chunks = vector_store.search(
         lesson_query,
-        k=20,
+        k=min(20, len(chunks)),
+        chapter_number=selected_number,
     )
 
-    # --------------------------------------------------
-    # Generate lesson
-    # --------------------------------------------------
+    if not retrieved_chunks:
+        raise ValueError(
+            "No chunks were retrieved for the selected chapter."
+        )
 
     lesson = generate_instructor_guide(
         selected_chapter=selected_chapter,
@@ -82,20 +90,12 @@ def generate_complete_lesson(
         ollama_model=ollama_model,
     )
 
-    # --------------------------------------------------
-    # Evaluate
-    # --------------------------------------------------
-
     evaluation = evaluate_lesson(
         instructor_guide=lesson,
         retrieved_chunks=retrieved_chunks,
         provider=provider,
         ollama_model=ollama_model,
     )
-
-    # --------------------------------------------------
-    # Rewrite if necessary
-    # --------------------------------------------------
 
     lesson, rewritten = rewrite_lesson_if_needed(
         instructor_guide=lesson,
@@ -106,7 +106,6 @@ def generate_complete_lesson(
     )
 
     if rewritten:
-
         evaluation = evaluate_lesson(
             instructor_guide=lesson,
             retrieved_chunks=retrieved_chunks,
